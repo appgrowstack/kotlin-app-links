@@ -55,7 +55,7 @@ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page.marketUri)).setP
 
 ## 入れ方
 
-JitPack: `com.github.appgrowstack:kotlin-app-links:0.2.0`。
+JitPack: `com.github.appgrowstack:kotlin-app-links:0.3.0`。
 
 ## 動く環境
 
