@@ -1,0 +1,6 @@
+# JitPack が公開の repo のタグから組む（com.github.appgrowstack:kotlin-app-links:<版>）。
+# モジュールが1つの間は JitPack が repo の名前で出す
+jdk:
+  - openjdk21
+install:
+  - ./gradlew :links-core:publishToMavenLocal -Pversion=$VERSION
