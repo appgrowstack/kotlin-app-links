@@ -1,5 +1,3 @@
-English | [日本語](./README.ja.md)
-
 # kotlin-app-links
 
 Know where an Android install came from without guessing, link to your app from your own domain, and

@@ -1,23 +1,65 @@
-[English](./README.md) | 日本語
-
 # kotlin-app-links
 
-Android で入れた人がどこから来たかを推し量らずに決め、自分のドメインの短いリンクでアプリへ案内し、別のアプリの Google Play のページを、そのアプリが読める referrer 付きで開く。
+Androidで入れた人がどこから来たかを推し量らずに決め、自分のドメインからアプリへリンクし、別のアプリのGoogle Playのページを、そのアプリが読めるreferrer付きで開く。
 
-[swift-app-links](https://github.com/appgrowstack/swift-app-links) の Kotlin の側。どちらも同じ形で手がかりを送り、値を同じ形に揃え、同じ短いリンクを読む。
+[English](./README.md)
 
-> 開発は非公開のモノリポでしていて、ここへは片方向にコピーしている。Issue は受ける。PR は受けない。
+[swift-app-links](https://github.com/appgrowstack/swift-app-links)のKotlinの側。どちらも同じ手がかりを同じ形で送り、値を同じように揃え、同じ短いリンクを読む。
+
+![Kotlin](https://img.shields.io/badge/Kotlin-2.4-purple.svg)
+![JVM](https://img.shields.io/badge/JVM-17-blue.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+> 開発は非公開のモノリポでしていて、ここへは片方向にコピーしている。Issueは受ける。PRは受けない。
 
 ## できること
 
-- **確かな手がかりだけ。** 最初の起動で使うのは Play Install Referrer と、起動を開いた App Link だけ。IP・端末の指紋・タップの時刻・クリップボードは使わない。どちらも無ければ `organic`
-- **端末で決める。** `DeviceAttributionResolver` は referrer の utm と短いリンクの code、次に自分のドメインで開いた URL の短いリンクと utm を読む。Play の既定（`google-play`・`organic`）は手がかりにしない。サーバーに聞く resolver（`AttributionResolver`）に差し替えられる
-- **入れた人ごとに1回。決まるまで次の起動で試す。** 最初の起動は開いた URL を少し待ってから決める。Play が答えない・通信できないときは次の起動でもう一度。最初の答えを残すので、後で開いたリンクで流入元は変わらない
-- **自分のドメインの短いリンク。** `ShortLink` は `https://<ドメイン>/l/<code>`（作ったリンク）と `https://<ドメイン>/go/<code>`（名前を付けたリンク）を作り、読む。リンクを作るのはサーバーで、端末は作らない
-- **Play の製品ページ。** `PlayStorePage` は `https://play.google.com/store/apps/details` と `market://details` を、相手のアプリの Play Install Referrer に渡る `referrer` 付きで作り、読む
-- **Android に依存しない。** `links-core` は Kotlin/JVM（coroutines と kotlinx.serialization）。Play Install Referrer はアプリが `InstallReferrerSource` で渡し、ページはアプリの `Intent` で開く
+- **確かな手がかりだけ。** 最初の起動で使うのはPlay Install Referrerと、起動を開いたApp Linkだけ。IPアドレス・端末の指紋・タップの時刻・クリップボードは使わない。どちらも無ければ答えは `organic`
+- **端末で決める。** `DeviceAttributionResolver` はreferrerのutmと短いリンクのcode、次に自分のドメインで開いたURLの短いリンクとutmを読む。Playの既定（`google-play`・`organic`）は手がかりにしない。サーバーに問い合わせるresolverに差し替えられる（`AttributionResolver`）
+- **入れた人ごとに1回・決まるまでやり直す。** 最初の起動では開いたURLを少し待ってから決める。Playが答えない・通信できないときは次の起動でもう一度決める。最初の答えを持ち続けるので、後で開いたリンクで流入元は変わらない
+- **自分のドメインの短いリンク。** `ShortLink` は `https://<domain>/l/<code>`（作った物）と `https://<domain>/go/<code>`（名前を付けた物）を作って読む。リンクを作るのはサーバーで、端末は作らない
+- **Playの製品ページ。** `PlayStorePage` は `https://play.google.com/store/apps/details` と `market://details` を、相手のアプリのPlay Install Referrerに渡る `referrer` 付きで作って読む
+- **Androidに依存しない。** `links-core` はKotlin/JVM（coroutinesとkotlinx.serialization）。Play Install Referrerはアプリが `InstallReferrerSource` で渡し、ページはアプリの `Intent` で開く
 
-使い方は[README.md](./README.md)のQuick Start。入れ方はJitPackの`com.github.appgrowstack:kotlin-app-links:0.2.0`。
+## はじめに
+
+```kotlin
+val attribution = AttributionReporter(
+    installId = installId,                         // the id your analytics uses for this install
+    appVersion = BuildConfig.VERSION_NAME,
+    resolver = DeviceAttributionResolver(setOf("gohobishukan.com")),
+    storage = FileAttributionStorage(context.filesDir),
+    installReferrer = playInstallReferrer,         // InstallReferrerSource over Google's installreferrer library
+)
+
+// In the launcher activity: the App Link that opened the app.
+intent?.data?.toString()?.let(attribution::noteOpenedUrl)
+
+// Every launch; it resolves only until decided.
+lifecycleScope.launch {
+    attribution.reportIfNeeded()?.let { analytics.installAttributed(it) }
+}
+```
+
+`com.android.installreferrer:installreferrer` を包む十数行は、`InstallReferrerSource` のドキュメントにある。
+
+短いリンクとPlayのページ:
+
+```kotlin
+val link = ShortLink.of("gohobishukan.com", "spring-sale")!!    // https://gohobishukan.com/go/spring-sale
+ShortLink.parse(incomingUrl)?.let { route(it.code) }
+
+val page = PlayStorePage("com.example.reading", referrer = "utm_source=gohobi&utm_medium=cross_promo")
+context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page.marketUri)).setPackage("com.android.vending"))
+```
+
+## 入れ方
+
+JitPack: `com.github.appgrowstack:kotlin-app-links:0.2.0`。
+
+## 動く環境
+
+- Kotlin 2.4、JVM 17
 
 ## ライセンス
 
