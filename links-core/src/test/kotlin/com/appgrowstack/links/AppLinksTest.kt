@@ -81,9 +81,12 @@ private fun reporter(
     storage: AttributionStorage,
     resolver: AttributionResolver,
     referrer: InstallReferrer = InstallReferrer.None,
+    firstOpenAt: Long? = null,
+    maxAttempts: Int = AttributionReporter.DEFAULT_MAX_ATTEMPTS,
 ) = AttributionReporter(
     installId = INSTALL, appVersion = "3.3.0", resolver = resolver, storage = storage,
-    installReferrer = { referrer }, urlGraceMillis = 1, clock = { FIRST_OPEN }, sleep = {},
+    installReferrer = { referrer }, firstOpenAt = firstOpenAt, urlGraceMillis = 1, maxAttempts = maxAttempts,
+    clock = { FIRST_OPEN }, sleep = {},
 )
 
 class AttributionReporterTest {
@@ -169,6 +172,35 @@ class AttributionReporterTest {
     }
 
     @Test
+    fun givesUpAfterMaxAttemptsOfTryLater() = runTest {
+        val storage = InMemoryAttributionStorage()
+        val resolver = FakeResolver(AttributionResolution.RetryLater, AttributionResolution.RetryLater, AttributionResolution.RetryLater, AttributionResolution.Decided(link))
+        assertNull(reporter(storage, resolver, maxAttempts = 3).reportIfNeeded())
+        assertNull(reporter(storage, resolver, maxAttempts = 3).reportIfNeeded())
+        assertFalse(storage.isFinished)
+        assertNull(reporter(storage, resolver, maxAttempts = 3).reportIfNeeded())
+        assertTrue(storage.isFinished)
+        assertEquals(3, storage.attempts)
+        // Finished without a source: nothing more is sent.
+        assertNull(reporter(storage, resolver, maxAttempts = 3).reportIfNeeded())
+        assertEquals(3, resolver.sent.size)
+    }
+
+    @Test
+    fun theFirstOpenDateTheAppKnewIsSentForAPersonWhoUpdated() = runTest {
+        val storage = InMemoryAttributionStorage()
+        val resolver = FakeResolver(AttributionResolution.Decided(organic))
+        reporter(storage, resolver, firstOpenAt = 1_700_000_000_000).reportIfNeeded()
+        assertEquals(1_700_000_000_000, resolver.sent.single().firstOpenAt)
+        assertEquals(1_700_000_000_000, storage.firstOpenAt)
+
+        // A later date than the stored one does not move it.
+        val other = InMemoryAttributionStorage(firstOpenAt = 1_600_000_000_000)
+        reporter(other, FakeResolver(), firstOpenAt = 1_700_000_000_000)
+        assertEquals(1_600_000_000_000, other.firstOpenAt)
+    }
+
+    @Test
     fun ignoresUrlsThatAreNotHttps() {
         val storage = InMemoryAttributionStorage()
         reporter(storage, FakeResolver()).noteOpenedUrl("gohobi://pair/abc")
@@ -185,7 +217,8 @@ class AttributionReporterTest {
 
         val stored = FileAttributionStorage(directory)
         assertEquals(FIRST_OPEN, stored.firstOpenAt)
-        assertEquals("https://gohobishukan.com/l/Ab12Cd34", stored.openedUrl)
+        // Decided: the opening URL (it may carry an invite code) is not kept
+        assertNull(stored.openedUrl)
         assertEquals(link, stored.attribution)
         assertTrue(stored.isFinished)
         assertFalse(reporter(stored, resolver).isFirstLaunch)

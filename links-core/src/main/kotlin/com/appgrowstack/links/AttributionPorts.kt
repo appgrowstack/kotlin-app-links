@@ -11,6 +11,9 @@ public interface AttributionStorage {
     /** Set once the source was decided (or can never be). Nothing is resolved after that. */
     public var attribution: Attribution?
     public var isFinished: Boolean
+
+    /** How many times the clues were resolved and the answer was "try later". */
+    public var attempts: Int
 }
 
 /** In memory, for tests and previews. */
@@ -19,6 +22,7 @@ public class InMemoryAttributionStorage(
     override var openedUrl: String? = null,
     override var attribution: Attribution? = null,
     override var isFinished: Boolean = false,
+    override var attempts: Int = 0,
 ) : AttributionStorage
 
 /** One JSON file, `<directory>/app_links/attribution.json`. Pass `context.filesDir`. */
@@ -29,6 +33,7 @@ public class FileAttributionStorage(directory: File) : AttributionStorage {
         val openedUrl: String? = null,
         val attribution: Attribution? = null,
         val isFinished: Boolean = false,
+        val attempts: Int = 0,
     )
 
     private val file = File(File(directory, "app_links"), "attribution.json")
@@ -62,6 +67,10 @@ public class FileAttributionStorage(directory: File) : AttributionStorage {
     override var isFinished: Boolean
         get() = synchronized(lock) { read().isFinished }
         set(value) = update { it.copy(isFinished = value) }
+
+    override var attempts: Int
+        get() = synchronized(lock) { read().attempts }
+        set(value) = update { it.copy(attempts = value) }
 }
 
 /** What the Play Install Referrer API answered. */

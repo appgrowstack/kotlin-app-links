@@ -15,12 +15,18 @@ import kotlinx.coroutines.sync.Mutex
  * the answer is `organic`.
  *
  * The resolver decides ([DeviceAttributionResolver] on the device, or a server). When it asks to try
- * later (offline, Play not answering), the clues are resolved again on a later launch. A URL is only
- * taken during the first launch, so a link opened weeks later never rewrites where the install came
- * from.
+ * later (offline, Play not answering), the clues are resolved again on a later launch, up to
+ * [maxAttempts] times in all; after that the install stays without a source. A URL is only taken
+ * during the first launch, so a link opened weeks later never rewrites where the install came from,
+ * and it is forgotten once the source is decided.
  *
  * @param installId the id your analytics uses for this install (lowercase UUID).
  * @param appVersion `versionName`, `x.y.z`.
+ * @param firstOpenAt when the install was first opened (epoch milliseconds), if the app knew it
+ *   before this reporter existed (the app's own first-open date, or the one its connector keeps). The
+ *   earlier of this and the stored date is sent, so a person who updated into this version is not
+ *   reported as installed today.
+ * @param maxAttempts how many times the clues are resolved before giving up.
  * @param clock epoch milliseconds.
  */
 public class AttributionReporter(
@@ -29,14 +35,21 @@ public class AttributionReporter(
     private val resolver: AttributionResolver,
     private val storage: AttributionStorage,
     private val installReferrer: InstallReferrerSource = InstallReferrerSource.None,
+    firstOpenAt: Long? = null,
     private val urlGraceMillis: Long = DEFAULT_URL_GRACE_MILLIS,
+    maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     clock: () -> Long = System::currentTimeMillis,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) {
     public companion object {
         /** How long the first launch waits for the opening URL before reporting without it. */
         public const val DEFAULT_URL_GRACE_MILLIS: Long = 3_000
+
+        /** How many times the clues are resolved before giving up (each "try later" counts). */
+        public const val DEFAULT_MAX_ATTEMPTS: Int = 20
     }
+
+    private val maxAttempts = maxAttempts.coerceAtLeast(1)
 
     /** `true` when this process is the install's first launch (nothing was stored before it). */
     public val isFirstLaunch: Boolean
@@ -45,12 +58,10 @@ public class AttributionReporter(
     private val inFlight = Mutex()
 
     init {
-        if (storage.firstOpenAt == null) {
-            storage.firstOpenAt = clock()
-            isFirstLaunch = true
-        } else {
-            isFirstLaunch = false
-        }
+        val stored = storage.firstOpenAt
+        isFirstLaunch = stored == null
+        val earliest = listOfNotNull(stored, firstOpenAt, if (stored == null) clock() else null).min()
+        if (earliest != stored) storage.firstOpenAt = earliest
     }
 
     /** The decided source, once there is one. */
@@ -98,18 +109,28 @@ public class AttributionReporter(
             return when (val answer = resolver.resolve(request)) {
                 is AttributionResolution.Decided -> {
                     storage.attribution = answer.attribution
-                    storage.isFinished = true
+                    finish()
                     answer.attribution
                 }
                 AttributionResolution.Rejected -> {
                     // The clues will never pass; resolving them again on every launch would only add noise.
-                    storage.isFinished = true
+                    finish()
                     null
                 }
-                AttributionResolution.RetryLater -> null
+                AttributionResolution.RetryLater -> {
+                    storage.attempts += 1
+                    if (storage.attempts >= maxAttempts) finish()
+                    null
+                }
             }
         } finally {
             inFlight.unlock()
         }
+    }
+
+    /** Nothing is resolved after this. The opening URL (it may carry an invite code) is not kept. */
+    private fun finish() {
+        storage.isFinished = true
+        storage.openedUrl = null
     }
 }

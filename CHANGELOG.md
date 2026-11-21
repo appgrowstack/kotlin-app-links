@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `AttributionReporter(firstOpenAt = …)`: when the install was first opened, if the app knew it
+  before the reporter existed. The earlier of it and the stored date is
+  sent, so a person who updated into the SDK is not reported as installed today.
+- `AttributionReporter(maxAttempts = …)` (default `DEFAULT_MAX_ATTEMPTS`, 20): after that many "try
+  later" answers the reporter stops without a source. `AttributionStorage.attempts` keeps the count.
+
+### Changed
+
+- `AttributionStorage` has `attempts`; implement it in your own storage.
+- Once the source is decided (or can never be), the opening URL is no longer kept (it may carry an
+  invite code).
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
