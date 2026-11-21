@@ -71,7 +71,7 @@ context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page.marketUri)).setP
 
 ## Installation
 
-JitPack: `com.github.appgrowstack:kotlin-app-links:<version>`.
+JitPack: `com.github.appgrowstack:kotlin-app-links:0.2.0`.
 
 ## Requirements
 

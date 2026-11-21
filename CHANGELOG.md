@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-22
+
 ### Added
 
 - `links-core`: the Kotlin side of swift-app-links. `LinksSdk.NAME` and `LinksSdk.VERSION` for a connector to report.

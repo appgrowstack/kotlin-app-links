@@ -6,5 +6,5 @@ public object LinksSdk {
     public const val NAME: String = "kotlin-app-links"
 
     /** The released version. Must equal `version` in gradle.properties (LinksSdkTest checks it). */
-    public const val VERSION: String = "0.1.0"
+    public const val VERSION: String = "0.2.0"
 }

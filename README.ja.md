@@ -17,7 +17,7 @@ Android で入れた人がどこから来たかを推し量らずに決め、自
 - **Play の製品ページ。** `PlayStorePage` は `https://play.google.com/store/apps/details` と `market://details` を、相手のアプリの Play Install Referrer に渡る `referrer` 付きで作り、読む
 - **Android に依存しない。** `links-core` は Kotlin/JVM（coroutines と kotlinx.serialization）。Play Install Referrer はアプリが `InstallReferrerSource` で渡し、ページはアプリの `Intent` で開く
 
-使い方は [README.md](./README.md) の Quick Start。入れ方は JitPack の `com.github.appgrowstack:kotlin-app-links:<版>`。
+使い方は[README.md](./README.md)のQuick Start。入れ方はJitPackの`com.github.appgrowstack:kotlin-app-links:0.2.0`。
 
 ## ライセンス
 
